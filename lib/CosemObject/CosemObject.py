@@ -39,9 +39,11 @@ logger.addHandler(console_handler)
 logger.addHandler(file_handler)
 
 class Node:
-    def __init__(self, id:str) -> None:
+    def __init__(self, node_ui_state) -> None:
         '''
-           Attribute/Method presentation of COSEM
+           @brief - Attribute/Method presentation of COSEM
+           @param - (node_ui_state str)
+                    json string of ui state
         '''
         self.id = id
         self.data_structure = None
@@ -116,18 +118,18 @@ class COSEM:
             Walk the structure of attribute/method nodes. NOTE: Attribute and method represented list of "Tree" structure of Nodes.
             Refer to backend documentation
         '''
-        # dtype = node['_dtype']
-        # output = node[key]
-        # if "Array" in dtype and key == '_dtype':
-        #     output = ({dtype: [self.walk(node['arrayTemplate'], key)]})
+        dtype = node['_dtype']
+        output = node[key]
+        if "Array" in dtype and key == '_dtype':
+            output = ({dtype: [self.walk(node['arrayTemplate'], key)]})
             
-        # elif "Array" in dtype or "Structure" in dtype:
-        #     output = {}
-        #     output[dtype] = []
-        #     temp = []
-        #     for child in node['children']:
-        #         temp.append(self.walk(child, key))
-        #     output[dtype] = temp
+        elif "Array" in dtype or "Structure" in dtype:
+            output = {}
+            output[dtype] = []
+            temp = []
+            for child in node['children']:
+                temp.append(self.walk(child, key))
+            output[dtype] = temp
         return None
     
     def render(self, data):
@@ -157,11 +159,6 @@ class COSEM:
             Mtd.max_value = self.walk(mtd, 'maxValue')
             self.attributes.append(deepcopy(Mtd))
 
-def get_data_structure(cosem):
-    def walk(attribute):
-        pass
-    pass    
-
 def get_cosem_list(projectname, version):
     cosem_list = requests.get(f'{BACKEND_API}/project/getcosemlist/{projectname}/{version}')
     return cosem_list.json()
@@ -170,9 +167,13 @@ def fetch_cosem(projectname, version):
     logger.info('Fetch all cosem data')
     cosem_list = get_cosem_list(PROJECT_NAME, VERSION)    
     cosem_list_out = []
+    
+    # Iterate cosem 
     for cosem in cosem_list:
         cosem_data = requests.get(f'{BACKEND_API}/project/get/{projectname}/{version}/{cosem}').json()
         object = COSEM(cosem_data)
+        for att in object.attributes:
+            print(att)
         break
 
     return cosem_list_out
