@@ -4,7 +4,7 @@ import pathlib
 from copy import deepcopy
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
-PROJECT_DIR = CURRENT_DIR.parent
+PROJECT_DIR = CURRENT_DIR.parent.parent
 LOG_DATA_DIR = f'{PROJECT_DIR}/log_data'
 
 BACKEND_API = 'http://10.23.40.185/api'
@@ -38,7 +38,7 @@ file_handler.setFormatter(logging.Formatter('[%(asctime)s - %(name)s] - %(leveln
 logger.addHandler(console_handler)
 logger.addHandler(file_handler)
 
-class Node:
+class AttributeTree:
     def __init__(self, node_ui_state) -> None:
         '''
            @brief - Attribute/Method presentation of COSEM
@@ -51,56 +51,48 @@ class Node:
         self.min_value = None
         self.max_value = None
         self.association  = None
+        
+        self.render(node_ui_state)
     
-    # @property
-    # def data_structure(self, flatten:bool = False) -> list:
-    #     '''
-    #         Data structure getter
-    #     '''
-    #     if flatten:
-    #         pass
-    #     return self.data_structure
-    # @data_structure.setter
-    # def data_structure(self, new_value) -> None:
-    #     self.data_structure = new_value
+    def walk(self, node, key):
+        '''
+            Walk the structure of attribute/method node.
+            Refer to backend documentation
+        '''
+        dtype = node['_dtype']
+        output = node[key]
+        if "Array" in dtype and key == '_dtype':
+            _key = f'{dtype}-{node["minValue"]}-{node["maxValue"]}'
+            output = ({_key: [self.walk(node['arrayTemplate'], key)]})
+            
+        elif "Structure" in dtype: # for structure
+            output = {}
+            output[dtype] = []
+            temp = []
+            for child in node['children']:
+                temp.append(self.walk(child, key))
+            output[dtype] = temp
+        elif "Array" in dtype: # for array
+            output = {}
+            _key = f'{dtype}-{node["minValue"]}-{node["maxValue"]}'
+            output[_key] = []
+            temp = []
+            for child in node['children']:
+                temp.append(self.walk(child, key))
+            output[_key] = temp
+        return output
     
-    # @property
-    # def min_value(self, flatten:bool = True) -> list:
-    #     '''
-    #         Minimum value getter
-    #     '''
-    #     if flatten:
-    #         pass
-    #     return self.min_value
-    # @min_value.setter
-    # def min_value(self, new_value) -> None:
-    #     self.min_value = new_value
+    def render(self, attribute_state):
+        '''
+            Render attribute_state to object
+        '''
+        self.id = attribute_state['id']
+        self.data_structure = self.walk(attribute_state, '_dtype')
+        self.default_value = self.walk(attribute_state, 'defaultValue')
+        self.min_value = self.walk(attribute_state, 'minValue')
+        self.max_value = self.walk(attribute_state, 'maxValue')
     
-    # @property
-    # def max_value(self, flatten:bool = True) -> list:
-    #     '''
-    #         Maximum value getter
-    #     '''
-    #     if flatten:
-    #         pass
-    #     return self.max_value
-    # @max_value.setter
-    # def max_value(self, new_value):
-    #     self.max_value = new_value
-    
-    # @property
-    # def association(self, flatten:bool = True) -> list:
-    #     '''
-    #         Default value getter
-    #     '''
-    #     if flatten:
-    #         pass
-    #     return self.association
-    # @max_value.setter
-    # def association(self, new_value):
-    #     self.association = new_value
-    
-class COSEM:
+class   COSEM:
     def __init__(self, ui_state) -> None:
         '''
             UI State stored in database. The us_state itself represent COSEM object 
@@ -112,26 +104,7 @@ class COSEM:
         self.methods = []
         
         self.render(ui_state)
-        
-    def walk(self, node, key):
-        '''
-            Walk the structure of attribute/method nodes. NOTE: Attribute and method represented list of "Tree" structure of Nodes.
-            Refer to backend documentation
-        '''
-        dtype = node['_dtype']
-        output = node[key]
-        if "Array" in dtype and key == '_dtype':
-            output = ({dtype: [self.walk(node['arrayTemplate'], key)]})
             
-        elif "Array" in dtype or "Structure" in dtype:
-            output = {}
-            output[dtype] = []
-            temp = []
-            for child in node['children']:
-                temp.append(self.walk(child, key))
-            output[dtype] = temp
-        return None
-    
     def render(self, data):
         '''
             Render data from UI state format
@@ -143,21 +116,13 @@ class COSEM:
         method_list = data['method']
         # Render Attribute
         for att in attribute_list:
-            Att = Node(att['id'])
-            Att.data_structure = self.walk(att, '_dtype')
-            Att.default_value = self.walk(att, 'defaultValue')
-            Att.min_value = self.walk(att, 'minValue')
-            Att.max_value = self.walk(att, 'maxValue')
+            Att = AttributeTree(att)
             self.attributes.append(deepcopy(Att))
 
         # Render Method
         for mtd in method_list:
-            Mtd = Node(att['id'])
-            Mtd.data_structure = self.walk(mtd, '_dtype')
-            Mtd.default_value = self.walk(mtd, 'defaultValue')
-            Mtd.min_value = self.walk(mtd, 'minValue')
-            Mtd.max_value = self.walk(mtd, 'maxValue')
-            self.attributes.append(deepcopy(Mtd))
+            Mtd = AttributeTree(mtd)
+            self.methods.append(deepcopy(Mtd))
 
 def get_cosem_list(projectname, version):
     cosem_list = requests.get(f'{BACKEND_API}/project/getcosemlist/{projectname}/{version}')
@@ -173,7 +138,10 @@ def fetch_cosem(projectname, version):
         cosem_data = requests.get(f'{BACKEND_API}/project/get/{projectname}/{version}/{cosem}').json()
         object = COSEM(cosem_data)
         for att in object.attributes:
-            print(att)
+            print(att.data_structure)
+            print(att.default_value)
+            print(att.min_value)
+            print(att.max_value)
         break
 
     return cosem_list_out
