@@ -5,13 +5,10 @@ from copy import deepcopy
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 PROJECT_DIR = CURRENT_DIR.parent.parent
-LOG_DATA_DIR = f'{PROJECT_DIR}/log_data'
-APP_DATA_DIR = f'{PROJECT_DIR}/app_data'
+LOG_DATA_DIR = f'{PROJECT_DIR}/logdata'
+APP_DATA_DIR = f'{PROJECT_DIR}/appdata'
 
 BACKEND_API = 'http://10.23.40.185/api'
-PROJECT_NAME = 'RUBY'
-VERSION = '0.04_20230922'
-OBJECT_NAME = 'PRMNumber'
 
 LEVEL = {
     "NOTSET" : logging.NOTSET,
@@ -27,7 +24,7 @@ LEVEL = {
 # Create a logger
 logger = logging.getLogger(__name__)
 # Set the log level
-logger.setLevel(LEVEL['DEBUG'])
+logger.setLevel(LEVEL['INFO'])
 # Create file handler
 file_handler = logging.FileHandler(f'{LOG_DATA_DIR}/lib_CosemObject.log')
 # Create a console handler
@@ -248,22 +245,56 @@ class COSEM:
                 Mtd = None
             self.methods.append(deepcopy(Mtd))
 
-def get_cosem_list(projectname, version):
-    cosem_list = requests.get(f'{BACKEND_API}/project/getcosemlist/{projectname}/{version}')
-    return cosem_list.json()
-
-def fetch_cosem(projectname, version):
-    logger.info('Fetch all cosem data')
-    cosem_list = get_cosem_list(PROJECT_NAME, VERSION)    
-    cosem_list_out = []
+class CosemWrapper:
+    def __init__(self, projectname, version):
+        '''
+            Generate wrapper that wrap cosem objects based on project name and version
+            @param - projectname {str} the project will be used
+            @param - version {str} the version of database inside the project
+        '''
+        self.projectname = projectname
+        self.version = version
+        self.cosem_list = self.fetch_cosem()
     
-    # Iterate cosem 
-    for cosem in cosem_list:
-        logger.debug(f'[fetch_cosem] fetching {cosem}')
-        cosem_data = requests.get(f'{BACKEND_API}/project/get/{projectname}/{version}/{cosem}').json()
-        object = COSEM(cosem_data)
-        cosem_list_out.append(object)
-            
-    return cosem_list_out
+    def get_cosem_list(self):
+        '''
+            GET cosem list inside database
+        '''
+        cosem_list = requests.get(f'{BACKEND_API}/project/getcosemlist/{self.projectname}/{self.version}')
+        return cosem_list.json()
+
+    def fetch_cosem(self):
+        '''
+            Based on project name and version, it will fetch cosem object inside a file or fetch from server. If the file doen't exist, the file will genereate after fetching data.
+        '''
+        import os
+        import pickle
+        filename = f'objectlist_{self.projectname}_{self.version}'
+        if filename in os.listdir(APP_DATA_DIR): # LOAD COSEM_PROJECT
+            logger.info(f'[CosemWrapper::fetch_cosem] FOUND COSEM list file: {filename}!!')
+            with open(f'{APP_DATA_DIR}/{filename}', 'rb') as f:
+                logger.info(f'[CosemWrapper::fetch_cosem] loading file')
+                cosem_list_out = pickle.load(f)
+                return cosem_list_out
         
-fetch_cosem(PROJECT_NAME, VERSION)
+        # else:  # INITIALIZE COSEM_PROJECT
+        logger.info('[CosemWrapper::fetch_cosem] First synchronize, fetch all cosem data')
+        cosem_list = self.get_cosem_list()    
+        cosem_list_out = []
+        
+        # Iterate cosem 
+        for cosem in cosem_list:
+            logger.debug(f'[fetch_cosem] fetching {cosem}')
+            cosem_data = requests.get(f'{BACKEND_API}/project/get/{self.projectname}/{self.version}/{cosem}').json()
+            object = COSEM(cosem_data)
+            cosem_list_out.append(object)
+                
+        logger.info(f'[CosemWrapper::fetch_cosem] Store cosem list in {APP_DATA_DIR}/{filename}')
+        with open(f'{APP_DATA_DIR}/{filename}', 'wb') as f:
+            pickle.dump(cosem_list_out, f)        
+        return cosem_list_out
+
+# EXAMPLE
+# PROJECT_NAME = 'RUBY'
+# VERSION = '0.04_20230922'
+# cosemWrapper = CosemWrapper(PROJECT_NAME, VERSION)
