@@ -47,14 +47,73 @@ class AttributeTree:
         '''
         self.id = id
         self.data_structure = None
+        self.enumerated_data_structure = None
         self.default_value = None
         self.min_value = None
         self.max_value = None
         self.association  = None
         
         self.render(node_ui_state)
-    
-    def walk(self, node, key):
+        
+    def get_dtype_enum(self, dtype:str)-> int:
+        '''
+            Get enumerator standard blue book
+        '''
+        dtype_enum = {
+            None:None,
+            "NullDTO":0,
+            "BooleanDTO":3,
+            "BitStringDTO":4,
+            "Integer32DTO":5, 
+            "Unsigned32DTO": 6,
+            "OctetStringDTO":9, 
+            "VisibleStringDTO":10,
+            "utf8-string":12,
+            "bcd":13,
+            "Integer8DTO":15,
+            "Integer16DTO":16,
+            "Unsigned8DTO":17,
+            "Unsigned16DTO":18, 
+            "Integer64DTO":24,
+            "Unsigned64DTO":21, 
+            "EnumeratedDTO":22, 
+            "Float32DTO":23,
+            "Float64DTO":24,
+            "DateTime":25,
+            "Date":26,
+            "Time":27,
+            "Array":1,
+            "Structure":2,
+        }
+        if dtype == None:
+            return None
+        if 'Array' in dtype:
+            return 1
+        return dtype_enum[dtype]
+            
+    def flatten_attribute(self, data):
+        '''
+            
+        '''
+        def flatten(value_list):
+            '''
+                Remove dict
+            '''
+            output = []
+            for element in value_list:
+                if type(element) == dict:
+                    key = list(element.keys())[0]
+                    temp = []
+                    temp.append(key)
+                    temp.extend(flatten(element[key]))
+                    output.extend(temp)
+                    continue
+                output.append(element)
+            return output
+                
+        return [flatten([i]) for i in data]
+        
+    def extract_value(self, node, key):
         '''
             Walk the structure of attribute/method node.
             Refer to backend documentation
@@ -63,14 +122,14 @@ class AttributeTree:
         output = node[key]
         if "Array" in dtype and key == '_dtype':
             _key = f'{dtype}-{node["minValue"]}-{node["maxValue"]}'
-            output = ({_key: [self.walk(node['arrayTemplate'], key)]})
+            output = {_key: [self.extract_value(node['arrayTemplate'], key)]}
             
         elif "Structure" in dtype: # for structure
             output = {}
             output[dtype] = []
             temp = []
             for child in node['children']:
-                temp.append(self.walk(child, key))
+                temp.append(self.extract_value(child, key))
             output[dtype] = temp
         elif "Array" in dtype: # for array
             output = {}
@@ -78,7 +137,7 @@ class AttributeTree:
             output[_key] = []
             temp = []
             for child in node['children']:
-                temp.append(self.walk(child, key))
+                temp.append(self.extract_value(child, key))
             output[_key] = temp
         return output
     
@@ -87,12 +146,34 @@ class AttributeTree:
             Render attribute_state to object
         '''
         self.id = attribute_state['id']
-        self.data_structure = self.walk(attribute_state, '_dtype')
-        self.default_value = self.walk(attribute_state, 'defaultValue')
-        self.min_value = self.walk(attribute_state, 'minValue')
-        self.max_value = self.walk(attribute_state, 'maxValue')
+        self.data_structure = self.extract_value(attribute_state, '_dtype')
+        self.default_value = self.extract_value(attribute_state, 'defaultValue')
+        self.min_value = self.extract_value(attribute_state, 'minValue')
+        self.max_value = self.extract_value(attribute_state, 'maxValue')
+        
+        def transform_data_structure(data):
+            if type(data) == list:
+                output = []
+                for value in data:
+                    result = transform_data_structure(value)
+                    output.append(result)
+                return output
+                
+            elif type(data) == dict:
+                output = {}
+                _key = list(data.keys())[0]
+                _enumerate_key = self.get_dtype_enum("Array" if "Array" in _key else _key)
+                output[_enumerate_key] = []
+                for value in data[_key]:
+                    result = transform_data_structure(value)
+                    output[_enumerate_key].append(result)
+                return output
+            
+            output = self.get_dtype_enum(data)
+            return output
+        self.enumerated_data_structure = transform_data_structure(self.data_structure)
     
-class   COSEM:
+class COSEM:
     def __init__(self, ui_state) -> None:
         '''
             UI State stored in database. The us_state itself represent COSEM object 
@@ -104,6 +185,32 @@ class   COSEM:
         self.methods = []
         
         self.render(ui_state)
+        
+    def flatten_attribute(self, data):
+        '''
+            Flatten attribute tree
+        '''
+        if type(data) == dict:
+            _key = list(data.keys())[0]
+            output = [_key]
+            output.extend(self.flatten_attribute(data[_key]))
+            
+            while True:
+                test = [type(i) for i in output]
+                if list in test:
+                    output = self.flatten_attribute(output)
+                else:
+                    break
+            return output
+        elif type(data) == list:
+            output = []
+            for value in data:
+                if type(value) != list:
+                    output.append(self.flatten_attribute(value))
+                else:
+                    output.extend(self.flatten_attribute(value))
+            return output
+        return data
             
     def render(self, data):
         '''
@@ -138,7 +245,9 @@ def fetch_cosem(projectname, version):
         cosem_data = requests.get(f'{BACKEND_API}/project/get/{projectname}/{version}/{cosem}').json()
         object = COSEM(cosem_data)
         for att in object.attributes:
-            print(att.data_structure)
+            print(att.data_structure)            
+            print(object.flatten_attribute(att.enumerated_data_structure))
+            print(att.enumerated_data_structure)
             print(att.default_value)
             print(att.min_value)
             print(att.max_value)
