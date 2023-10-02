@@ -6,6 +6,7 @@ from copy import deepcopy
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 PROJECT_DIR = CURRENT_DIR.parent.parent
 LOG_DATA_DIR = f'{PROJECT_DIR}/log_data'
+APP_DATA_DIR = f'{PROJECT_DIR}/app_data'
 
 BACKEND_API = 'http://10.23.40.185/api'
 PROJECT_NAME = 'RUBY'
@@ -28,7 +29,7 @@ logger = logging.getLogger(__name__)
 # Set the log level
 logger.setLevel(LEVEL['DEBUG'])
 # Create file handler
-file_handler = logging.FileHandler(f'{LOG_DATA_DIR}/CosemObject.log')
+file_handler = logging.FileHandler(f'{LOG_DATA_DIR}/lib_CosemObject.log')
 # Create a console handler
 console_handler = logging.StreamHandler()
 # Set the log format
@@ -45,7 +46,8 @@ class AttributeTree:
            @param - (node_ui_state str)
                     json string of ui state
         '''
-        self.id = id
+        self.id = node_ui_state['id']
+        logger.debug(f'[AttributeTree::init] Generating node id-{self.id}')
         self.data_structure = None
         self.enumerated_data_structure = None
         self.default_value = None
@@ -120,7 +122,11 @@ class AttributeTree:
         '''
         dtype = node['_dtype']
         output = node[key]
-        if "Array" in dtype and key == '_dtype':
+        if dtype == 'Choice':
+            logger.debug(f'[AttributeTree::extract_value] Get choice data type. Get the first child')
+            output = self.extract_value(node["children"][0], key)
+        
+        elif "Array" in dtype and key == '_dtype':
             _key = f'{dtype}-{node["minValue"]}-{node["maxValue"]}'
             output = {_key: [self.extract_value(node['arrayTemplate'], key)]}
             
@@ -145,6 +151,9 @@ class AttributeTree:
         '''
             Render attribute_state to object
         '''
+        if attribute_state == None: # for some case an attribute is None, which is the attribute is not used
+            return None
+        
         self.id = attribute_state['id']
         self.data_structure = self.extract_value(attribute_state, '_dtype')
         self.default_value = self.extract_value(attribute_state, 'defaultValue')
@@ -222,13 +231,21 @@ class COSEM:
         attribute_list = data['attribute']
         method_list = data['method']
         # Render Attribute
+        logger.debug('[COSEM:render] rendering attributes')
         for att in attribute_list:
-            Att = AttributeTree(att)
+            if att != None:
+                Att = AttributeTree(att)
+            else:
+                Att = None
             self.attributes.append(deepcopy(Att))
 
         # Render Method
+        logger.debug('[COSEM:render] rendering methods')
         for mtd in method_list:
-            Mtd = AttributeTree(mtd)
+            if mtd != None:
+                Mtd = AttributeTree(mtd)
+            else:
+                Mtd = None
             self.methods.append(deepcopy(Mtd))
 
 def get_cosem_list(projectname, version):
@@ -242,18 +259,11 @@ def fetch_cosem(projectname, version):
     
     # Iterate cosem 
     for cosem in cosem_list:
+        logger.debug(f'[fetch_cosem] fetching {cosem}')
         cosem_data = requests.get(f'{BACKEND_API}/project/get/{projectname}/{version}/{cosem}').json()
         object = COSEM(cosem_data)
-        for att in object.attributes:
-            print(att.data_structure)            
-            print(object.flatten_attribute(att.enumerated_data_structure))
-            print(att.enumerated_data_structure)
-            print(att.default_value)
-            print(att.min_value)
-            print(att.max_value)
-        break
-
+        cosem_list_out.append(object)
+            
     return cosem_list_out
         
-
 fetch_cosem(PROJECT_NAME, VERSION)
