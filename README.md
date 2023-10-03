@@ -2,7 +2,7 @@
 
 > This environment is an expansion, and it is designed to adapts with my customized Cosem Management System (CMS) with the mechanical hardware of the test station itself.
 
-Python package for electronic metering test station, DLMS based for RS232/RS485/Optical, using NAVDAQ data acuisition hardware.
+Python package for electric metering device test station, DLMS based for RS232/RS485/Optical, using NAVDAQ data acuisition hardware.
 
 The packages will connect us to main develoopment frameworks, it will make us develop test scripts faster by reducing repeatition task. For the advance purpose, this project will used in pipeline for Continuous Integration process. 
 
