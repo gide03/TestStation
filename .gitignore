@@ -1,3 +1,10 @@
+# python cache
+*.pyc
+
+# virtual environment
+env/ 
+
+# local usage directories
 appdata/
 constant/
 logdata/
