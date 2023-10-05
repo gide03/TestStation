@@ -86,7 +86,7 @@ class DlmsCosemClient:
 	def start_inactivity(self):
 		self.is_inactive = False
 		self.timer_count = 0
-		Thread(target = self.count_inactivity, args = ()).start()
+		Thread(target = self.count_inactivity, args = (), daemon=True).start()
 
 	def count_inactivity(self):
 		while self.timer_count <= self.timeout_counter and not self.is_timer_stop:

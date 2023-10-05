@@ -19,9 +19,9 @@ class InstantDigitalIO:
         self.instantDiCtrl.dispose()
     
     def resetDO(self):
-        self.AdvInstantDO()
+        self.InstantDO()
     
-    def setAdvInstantDO(self, value:int=0x00):
+    def InstantDO(self, value:int=0x00):
         '''
             Function to execute value
             param:
@@ -55,7 +55,7 @@ class InstantDigitalIO:
             print("Some error occurred. And the last error code is %#x. [%s]" % (ret.value, enumStr))
         return 0
 
-    def getAdvInstantDI(self):
+    def InstantDI(self):
         ret = ErrorCode.Success
 
         # Step 1: Create a 'InstantDiCtrl' for DI function.
