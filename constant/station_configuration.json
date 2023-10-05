@@ -1,0 +1,33 @@
+{
+  "Advantech": {
+    "USB_4704": {
+      "deviceDescription": "USB-4704,BID#0",
+      "profilePath": "constant/advantech_profile/PCI-1784.xml",
+      "startPort": 0,
+      "portCount": 1
+    },
+    "USB_4761": {
+      "deviceDescription": "USB-4761,BID#0",
+      "profilePath": "constant/advantech_profile/PCI-1784.xml",
+      "startPort": 0,
+      "portCount": 1
+    }
+  },
+
+  "FW_download": {
+    "FirmwareImagesPath": "appdata/fw_image",
+    "CommunicationPorts": {
+      "OPTICAL": "COM2",
+      "RS232": "COM3",
+      "RS485": "COM6"
+    }
+  },
+
+  "FCT": {
+    "CommunicationPorts": {
+      "OPTICAL": "COM4",
+      "RS232": "COM5",
+      "RS485": "COM7"
+    }
+  }
+}
